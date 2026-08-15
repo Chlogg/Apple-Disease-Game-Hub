@@ -1,0 +1,2135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Game Hub Compiler Engine</title>
+<style>
+  :root {
+    --bg: #1e1e1e; --panel: #252526; --border: #333; --text: #d4d4d4;
+    --accent: #ff3333; --accent-dim: #3a1a1a; --green: #73bf2e; --blue: #007acc;
+    --sidebar: #181818; --gutter: #1a1a1a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; font-size: 13px; }
+  
+  header { background: #2d2d2d; padding: 8px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; gap: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 10; }
+  h1 { margin: 0; font-size: 14px; color: var(--accent); text-transform: uppercase; letter-spacing: 1.5px; display: flex; align-items: center; gap: 8px; }
+  h1::before { content: '⚙'; font-size: 18px; }
+  .toolbar-group { display: flex; gap: 8px; align-items: center; }
+  .btn { background: #3a3a3a; color: var(--text); border: 1px solid #444; padding: 6px 14px; cursor: pointer; font-family: inherit; font-size: 12px; transition: 0.2s; border-radius: 4px; display: flex; align-items: center; gap: 6px; }
+  .btn:hover { background: #4a4a4a; border-color: #666; }
+  .btn.green { background: var(--accent-dim); border-color: var(--accent); color: #ff8888; }
+  .btn.green:hover { background: var(--accent); color: #000; }
+  .btn.media { background: #2d2d2d; border-color: #555; color: #fff; font-size: 14px; padding: 4px 8px; min-width: 32px; justify-content: center; }
+  .btn.media:hover { background: #3a3a3a; border-color: #888; }
+  .btn.small { padding: 2px 6px; font-size: 11px; min-width: auto; }
+  .btn.tab { background: none; border: none; border-bottom: 2px solid transparent; color: #888; border-radius: 0; padding: 8px 12px; }
+  .btn.tab.active { color: #fff; border-bottom-color: var(--accent); }
+  .btn.tab:hover { background: #2a2a2a; color: #fff; }
+  select { background: #3a3a3a; color: var(--text); border: 1px solid #555; padding: 5px 8px; border-radius: 4px; font-family: inherit; font-size: 12px; outline: none; }
+
+  .main-layout { display: grid; grid-template-columns: 220px 1fr; flex: 1; gap: 1px; background: #000; overflow: hidden; }
+  .pane { background: var(--panel); display: flex; flex-direction: column; overflow: hidden; }
+  .pane-header { padding: 8px 12px; background: #2d2d2d; border-bottom: 1px solid #000; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #888; display: flex; justify-content: space-between; align-items: center; height: 36px; }
+  
+  .sidebar { background: var(--sidebar); overflow-y: auto; }
+  .file-tree-item { padding: 8px 12px; font-size: 12px; cursor: pointer; border-left: 2px solid transparent; display: flex; justify-content: space-between; align-items: center; transition: background 0.1s; gap: 8px; }
+  .file-tree-item:hover { background: #2a2a2a; }
+  .file-tree-item.active { background: #2a2a2a; border-left-color: var(--accent); color: #fff; }
+  .file-tree-item .name { flex: 1; display: flex; align-items: center; gap: 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .file-tree-item .tag { font-size: 9px; background: #333; padding: 2px 5px; border-radius: 2px; color: #aaa; flex-shrink: 0; }
+  .file-tree-item .dirty { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; flex-shrink: 0; }
+  .file-tree-item .del-btn { background: none; border: none; color: #555; cursor: pointer; padding: 0; font-size: 14px; opacity: 0; transition: 0.2s; flex-shrink: 0; }
+  .file-tree-item:hover .del-btn { opacity: 1; }
+  .file-tree-item .del-btn:hover { color: var(--accent); }
+  
+  .add-game-btn { width: 100%; border: none; border-top: 1px solid #000; padding: 12px; background: #2d2d2d; color: #888; cursor: pointer; text-align: center; font-size: 11px; text-transform: uppercase; font-weight: 600; transition: 0.2s; }
+  .add-game-btn:hover { background: var(--accent-dim); color: #fff; }
+
+  .workspace { display: flex; flex-direction: column; background: var(--bg); }
+  .editor-container { flex: 1; display: flex; flex-direction: column; background: #1e1e1e; overflow: hidden; }
+  
+  /* Code Editor Overlay */
+  .editor-wrapper { flex: 1; display: flex; overflow: hidden; }
+  .line-numbers { width: 40px; background: var(--gutter); color: #555; text-align: right; padding: 12px 8px 12px 0; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.5; overflow: hidden; user-select: none; border-right: 1px solid #111; }
+  .code-editor-container { position: relative; flex: 1; overflow: hidden; }
+  .code-editor-container pre, .code-editor-container textarea {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    margin: 0; padding: 12px; border: 0;
+    font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.5;
+    white-space: pre; tab-size: 2; overflow: auto;
+  }
+  #codeHighlight { pointer-events: none; z-index: 1; color: #d4d4d4; background: transparent; overflow: hidden; }
+  #codeEditor { background: transparent; color: transparent; caret-color: #fff; z-index: 2; outline: none; resize: none; }
+  
+  /* Syntax Colors */
+  .c-comment { color: #6a9955; font-style: italic; }
+  .c-string { color: #ce9178; }
+  .c-keyword { color: #569cd6; }
+  .c-number { color: #b5cea8; }
+  .c-function { color: #dcdcaa; }
+  .c-punct { color: #d4d4d4; }
+  
+  /* Config Panel Styles */
+  .config-view { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 24px; }
+  .config-section { background: #252526; border: 1px solid #333; border-radius: 8px; padding: 20px; }
+  .config-section h4 { margin: 0 0 16px 0; color: var(--blue); font-size: 14px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  .icon-editor { display: flex; gap: 20px; align-items: flex-start; }
+  .icon-preview { width: 80px; height: 80px; background: #0a0a0a; border: 1px solid #333; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #555; font-size: 10px; text-align: center; overflow: hidden; }
+  .icon-preview svg, .icon-preview img { width: 100% !important; height: 100% !important; object-fit: contain !important; }
+  .icon-controls { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .icon-textarea { flex: 1; height: 100px; font-family: 'Courier New', monospace; font-size: 11px; background: #1e1e1e; color: #d4d4d4; border: 1px solid #444; border-radius: 4px; padding: 8px; resize: none; outline: none; }
+  .icon-actions { display: flex; gap: 8px; }
+  
+  .controls-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .control-box { background: #1e1e1e; border: 1px solid #333; border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .control-box-header { font-size: 12px; color: var(--accent); text-transform: uppercase; font-weight: bold; border-bottom: 1px solid #333; padding-bottom: 6px; display: flex; justify-content: space-between; }
+  .control-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .control-row label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+  .control-row input { background: #252526; border: 1px solid #444; color: #fff; padding: 4px 8px; border-radius: 4px; font-family: inherit; font-size: 12px; width: 100px; outline: none; }
+  .control-row input:focus { border-color: var(--blue); }
+  .rebind-btn { background: #2d2d2d; color: #e0e0e0; border: 1px solid #444; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-family: monospace; font-size: 11px; min-width: 60px; text-align: center; transition: 0.1s; }
+  .rebind-btn:hover { border-color: var(--accent); background: #3a1a1a; }
+  .rebind-btn.listening { background: var(--accent); color: #000; border-color: var(--accent); }
+  
+  #outputConsole { height: 160px; border-top: 1px solid #000; background: #181818; color: #ccc; padding: 10px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 11px; white-space: pre-wrap; line-height: 1.4; flex-shrink: 0; }
+
+  #sandboxOverlay { display: none; position: fixed; inset: 0; background: #1e1e1e; z-index: 100; flex-direction: column; }
+  .sandbox-header { height: 44px; background: #000; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid #333; flex-shrink: 0; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+  .sandbox-header h2 { margin: 0; font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 1px; display: flex; align-items: center; gap: 8px; }
+  .sandbox-header h2::before { content: '🌐'; }
+  .sandbox-actions { display: flex; gap: 8px; align-items: center; }
+  .sandbox-divider { width: 1px; height: 20px; background: #333; margin: 0 8px; }
+  #sandboxFrame { flex: 1; border: none; background: #fff; width: 100%; }
+  .error-banner { background: #5a0000; color: #ffaaaa; padding: 6px 12px; font-size: 11px; font-family: monospace; border-bottom: 1px solid #800; display: none; }
+
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 200; }
+  .modal { background: var(--panel); border: 1px solid #444; border-radius: 8px; padding: 24px; width: 320px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+  .modal.large { width: 720px; max-height: 85vh; display: flex; flex-direction: column; }
+  .modal h3 { margin: 0 0 16px 0; color: var(--accent); font-size: 14px; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; }
+  .modal input { width: 100%; padding: 10px; background: #1e1e1e; border: 1px solid #444; color: #fff; border-radius: 4px; font-family: inherit; font-size: 14px; margin-bottom: 16px; box-sizing: border-box; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  
+  .guide-content { flex: 1; overflow-y: auto; padding-right: 16px; font-size: 13px; line-height: 1.5; color: #ccc; }
+  .guide-content h4 { color: var(--blue); margin: 20px 0 8px 0; font-size: 15px; border-bottom: 1px solid #333; padding-bottom: 4px; }
+  .guide-content h4:first-child { margin-top: 0; }
+  .guide-content p { margin: 0 0 12px 0; }
+  .guide-content ul { margin: 0 0 12px 20px; padding: 0; }
+  .guide-content li { margin-bottom: 6px; }
+  .guide-content pre { background: #1e1e1e; padding: 12px; border-radius: 4px; border: 1px solid #333; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 12px; }
+  .guide-content code { background: #333; padding: 2px 4px; border-radius: 3px; font-family: 'Courier New', monospace; font-size: 12px; color: #f0f0f0; }
+  .guide-content .req { color: var(--accent); font-weight: bold; }
+  .guide-content .auto { color: var(--green); font-weight: bold; }
+  
+  #toast-container { position: fixed; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 8px; z-index: 300; }
+  .toast { background: #2d2d2d; border: 1px solid #444; border-left: 4px solid var(--green); color: #fff; padding: 12px 20px; border-radius: 4px; font-size: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s forwards; }
+  .toast.error { border-left-color: var(--accent); }
+  @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  @keyframes fadeOut { to { opacity: 0; transform: translateX(20px); } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Game Hub Engine</h1>
+  <div class="toolbar-group">
+    <select id="quickLaunch" title="Quick Launch Game"><option value="">Run Hub Menu</option></select>
+  </div>
+  <div class="toolbar-group">
+    <button class="btn green" onclick="compileAndRun()">▶ Compile & Run</button>
+    <button class="btn" onclick="copyOutput()">Copy Bookmarklet</button>
+    <button class="btn" onclick="showEngineSettingsModal()">⚙ Engine Config</button>
+    <button class="btn" onclick="showExtractModal()">📥 Extract</button>
+  </div>
+</header>
+
+<div class="main-layout">
+  
+  <div class="pane sidebar">
+    <div class="pane-header">
+      Explorer
+      <button class="btn small" onclick="showGuideModal()" title="Development Guide">?</button>
+    </div>
+    <div id="gamesList" style="flex:1; overflow-y: auto;"></div>
+    <button class="add-game-btn" onclick="showNewGameModal()">+ New Game Module</button>
+  </div>
+
+  <div class="pane workspace">
+    <div class="pane-header" style="padding: 0;">
+      <div style="display:flex; align-items:center; height: 100%; flex: 1;">
+        <span id="editorTitle" style="padding-left: 12px; flex: 1;">Select a Module</span>
+        <div id="tabsContainer" style="display: none;">
+          <button class="btn tab active" id="tabCode" onclick="switchTab('code')">Code</button>
+          <button class="btn tab" id="tabConfig" onclick="switchTab('config')">Config</button>
+        </div>
+      </div>
+      <span style="color:#666; font-size:10px; padding-right: 12px;">JavaScript</span>
+    </div>
+    
+    <div class="editor-container">
+      <!-- Code View -->
+      <div id="codeView" style="display: flex; flex: 1; flex-direction: column; overflow: hidden;">
+        <div class="editor-wrapper">
+          <div class="line-numbers" id="lineNumbers">1</div>
+          <div class="code-editor-container">
+            <pre id="codeHighlight" aria-hidden="true"></pre>
+            <textarea id="codeEditor" spellcheck="false" oninput="handleCodeChange()" onscroll="syncScroll()"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Config View -->
+      <div id="configView" class="config-view" style="display: none;">
+        <div class="config-section">
+          <h4>Icon Configuration (Stretches to 1:1)</h4>
+          <div class="icon-editor">
+            <div class="icon-preview" id="iconPreview">No Icon</div>
+            <div class="icon-controls">
+              <textarea id="iconInput" class="icon-textarea" placeholder="Paste raw <svg>...</svg> code here, or upload an image below." oninput="handleIconChange()"></textarea>
+              <div class="icon-actions">
+                <input type="file" id="iconFile" accept="image/*" style="display:none" onchange="handleFileUpload(event)">
+                <button class="btn" onclick="document.getElementById('iconFile').click()">📤 Upload Image</button>
+                <button class="btn" onclick="clearIcon()">🗑 Clear</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="config-section">
+          <h4>Controls Configuration</h4>
+          <p style="fontSize: 11px; color: #888; margin: 0 0 16px 0;">Click a key button to rebind it. These are the default controls for the Hub settings menu.</p>
+          <div class="controls-grid" id="controlsConfigList">
+            <!-- Auto-populated -->
+          </div>
+        </div>
+      </div>
+      
+      <div id="emptyState" style="flex:1; display:flex; align-items:center; justify-content:center; color:#444; font-size:14px; flex-direction:column; gap:8px;">
+        <span style="font-size:32px;">🎮</span>
+        <span>Select a game from the left to edit</span>
+      </div>
+    </div>
+    <div class="pane-header" style="border-top: 1px solid #000;">Console Output</div>
+    <div id="outputConsole"></div>
+  </div>
+</div>
+
+<!-- Full Screen Sandbox Overlay -->
+<div id="sandboxOverlay">
+  <div class="sandbox-header">
+    <h2>Playtest Environment (Mock Website)</h2>
+    <div class="sandbox-actions">
+      <button class="btn media" id="btnPlayPause" onclick="togglePlayPause()" title="Play/Pause">⏸</button>
+      <button class="btn media" id="btnStop" onclick="stopGame()" title="Stop">⏹</button>
+      <div class="sandbox-divider"></div>
+      <button class="btn" onclick="closeSandbox()">✕ Close</button>
+    </div>
+  </div>
+  <div class="error-banner" id="errorBanner"></div>
+  <iframe id="sandboxFrame" sandbox="allow-scripts allow-same-origin"></iframe>
+</div>
+
+<!-- New Game Modal -->
+<div class="modal-overlay" id="newGameModal">
+  <div class="modal">
+    <h3>Create New Game</h3>
+    <input type="text" id="newGameName" placeholder="e.g. Flappy Bird" onkeydown="if(event.key==='Enter') createNewGame()">
+    <div class="modal-actions">
+      <button class="btn" onclick="hideNewGameModal()">Cancel</button>
+      <button class="btn green" onclick="createNewGame()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Engine Settings Modal -->
+<div class="modal-overlay" id="engineSettingsModal">
+  <div class="modal">
+    <h3>⚙ Engine Config</h3>
+    <p style="color: #888; font-size: 12px; margin-bottom: 16px;">Set default keybinds for global Hub commands. Any key combination is supported. Hold the keys and release to save. Press <code>Backspace</code> to unbind.</p>
+    <div class="control-box">
+      <div class="control-box-header">
+        <span>Hub Commands</span>
+      </div>
+      <div class="control-row">
+        <label>Hide Hub UI</label>
+        <button class="rebind-btn" id="hubRebind-hide" onclick="startHubRebinding('hide')">KeyH</button>
+      </div>
+      <div class="control-row">
+        <label>Show Hub UI</label>
+        <button class="rebind-btn" id="hubRebind-show" onclick="startHubRebinding('show')">KeyJ</button>
+      </div>
+      <div class="control-row">
+        <label>Toggle Debug Mode</label>
+        <button class="rebind-btn" id="hubRebind-debug" onclick="startHubRebinding('debug')">F3</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="hideEngineSettingsModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Extract Modal -->
+<div class="modal-overlay" id="extractModal">
+  <div class="modal large">
+    <h3>📥 Extract Games from Compiled Script</h3>
+    <p style="color: #888; font-size: 12px; margin-bottom: 16px;">Paste an un-minified Game Hub script below to import its game modules back into the editor.</p>
+    <textarea id="extractInput" style="width: 100%; height: 300px; background: #1e1e1e; color: #d4d4d4; border: 1px solid #444; border-radius: 4px; padding: 12px; font-family: 'Courier New', monospace; font-size: 12px; resize: none; outline: none;" placeholder="javascript:(function(){ 'use strict'; ... const Games = [ ... ]; ... })();"></textarea>
+    <div class="modal-actions">
+      <button class="btn" onclick="hideExtractModal()">Cancel</button>
+      <button class="btn green" onclick="extractGames()">Extract & Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- Guide Modal -->
+<div class="modal-overlay" id="guideModal">
+  <div class="modal large">
+    <h3>📖 Game Hub Engine Manual</h3>
+        <div class="guide-content">
+      <p>This explains exactly what every command does, why it exists, and exactly where in your code it must be used for the engine to function correctly.</p>
+
+      <h4>1. The Game Object Contract</h4>
+      <p>Your factory function (e.g., <code>function createMyGame()</code>) must return an object with these four properties. The Hub engine uses this object to interface with your game.</p>
+      
+      <p><strong>el (HTMLCanvasElement)</strong></p>
+      <p>
+        <strong>What it is:</strong> The DOM canvas element where your game renders.<br>
+        <strong>Where it must be used:</strong> Returned at the very end of your factory function inside the returned object.<br>
+        <strong>How to use it:</strong> Create a canvas, configure its internal resolution (width/height), and pass it to <code>UI.applyCanvasStyle()</code>. Finally, return it as <code>el</code>. Do not append it to <code>document.body</code> yourself; the Hub handles that.
+      </p>
+      <p>Example:</p>
+      <pre><code>const c = document.createElement('canvas');
+c.width = 400; c.height = 300;
+UI.applyCanvasStyle(c, 400/300, 'My Game');
+return { el: c, /* ... */ };</code></pre>
+
+      <p><strong>onKey(code) (Function)</strong></p>
+      <p>
+        <strong>What it is:</strong> An event listener fired exactly once when a key is pressed down.<br>
+        <strong>Where it must be used:</strong> Returned as a method in the factory function's object.<br>
+        <strong>How to use it:</strong> Use this for one-shot, discrete actions like jumping, shooting a bullet, or restarting the game after a Game Over. Do not use it for continuous movement (like walking), because it only fires once per keypress.<br>
+        <strong>Parameters:</strong> <code>code</code> (String) - The raw <code>KeyboardEvent.code</code> (e.g., 'Space', 'KeyW'). You should compare this against your resolved <code>KEYS</code> object.
+      </p>
+      <p>Example:</p>
+      <pre><code>return {
+  // ...
+  onKey(code) {
+    if (code === KEYS.jump) { player.vy = -10; }
+    if (code === KEYS.restart && isGameOver) { resetGame(); }
+  }
+};</code></pre>
+
+      <p><strong>tick() (Function)</strong></p>
+      <p>
+        <strong>What it is:</strong> The main update loop, called exactly 60 times per second.<br>
+        <strong>Where it must be used:</strong> Returned as a method in the factory function's object.<br>
+        <strong>How to use it:</strong> This is the heart of your game. Put all physics calculations, enemy AI, collision detection, and canvas drawing (<code>ctx.fillRect</code>, etc.) inside this function. The Hub uses a fixed timestep accumulator, so this will run smoothly even on 144Hz monitors.
+      </p>
+      <p>Example:</p>
+      <pre><code>return {
+  // ...
+  tick() {
+    // 1. Update Physics
+    player.x += player.vx;
+    // 2. Check Input (held down)
+    if (Hub.keys[KEYS.moveRight]) player.vx = 5;
+    // 3. Draw to canvas
+    ctx.clearRect(0, 0, 400, 300);
+    ctx.fillRect(player.x, player.y, 20, 20);
+  }
+};</code></pre>
+
+      <p><strong>destroy() (Function)</strong></p>
+      <p>
+        <strong>What it is:</strong> The cleanup function, called when the user closes or stops your game.<br>
+        <strong>Where it must be used:</strong> Returned as a method in the factory function's object.<br>
+        <strong>How to use it:</strong> You must remove your canvas from the DOM. If you added any event listeners to the window (e.g., for mouse tracking), you must remove them here to prevent memory leaks.
+      </p>
+      <p>Example:</p>
+      <pre><code>return {
+  // ...
+  destroy() {
+    c.remove(); // Remove canvas
+    window.removeEventListener('mousemove', onMouseMove); // Clean up custom listeners
+  }
+};</code></pre>
+
+      <h4>2. Hub (Core Engine & Input)</h4>
+      <p>The central engine object. As a game developer, you primarily use it to check held-down key states.</p>
+      
+      <p><strong>Hub.keys (Object Property)</strong></p>
+      <p>
+        <strong>What it is:</strong> A live, read-only object mapping <code>KeyboardEvent.code</code> strings to booleans (<code>true</code> if held down, <code>false</code> or <code>undefined</code> if released).<br>
+        <strong>Where it must be used:</strong> Inside your <code>tick()</code> function. Do not use it in <code>onKey()</code>.<br>
+        <strong>How to use it:</strong> Check this for continuous actions (like walking, running, or holding down a throttle). Always access it using your resolved <code>KEYS</code> object so custom user keybinds work.
+      </p>
+      <p>Example:</p>
+      <pre><code>tick() {
+  if (Hub.keys[KEYS.moveLeft]) player.x -= 5;
+  if (Hub.keys[KEYS.moveRight]) player.x += 5;
+}</code></pre>
+      <p>(Note: <code>Hub.launch</code>, <code>Hub.stop</code>, <code>Hub.pause</code>, <code>Hub.resume</code> are internal engine functions used by the UI/Compiler to manage game lifecycles. You should never call them directly from inside your game).</p>
+
+      <h4>3. Store (Persistence & Bindings)</h4>
+      <p>Handles all localStorage data. Use this to save high scores and get the user's customized keybinds.</p>
+      
+      <p><strong>Store.bindings.resolve(gameName)</strong></p>
+      <p>
+        <strong>What it is:</strong> Fetches the user's current keybinds for your game.<br>
+        <strong>Where it must be used:</strong> At the very top of your factory function, before returning the game object.<br>
+        <strong>How to use it:</strong> Call this once, storing the result in a <code>const KEYS</code>. It merges the default controls you set in the Compiler Config tab with any custom overrides the user set in the Settings UI. Because it is declared at the top of the factory, <code>KEYS</code> will be in scope for your <code>onKey()</code> and <code>tick()</code> methods.<br>
+        <strong>Parameters:</strong> <code>gameName</code> (String) - The exact name of your game module.<br>
+        <strong>Returns:</strong> An object like <code>{ jump: 'Space', restart: 'KeyR' }</code>.
+      </p>
+      <p>Example:</p>
+      <pre><code>function createMyGame() {
+  const KEYS = Store.bindings.resolve('My Game'); // MUST BE HERE
+  const c = document.createElement('canvas');
+  // ...
+  return {
+    el: c,
+    onKey(code) { if (code === KEYS.jump) { /* ... */ } },
+    // ...
+  };
+}</code></pre>
+
+      <p><strong>Store.scores.get(gameName)</strong></p>
+      <p>
+        <strong>What it is:</strong> Retrieves the saved high score.<br>
+        <strong>Where it must be used:</strong> Usually inside your <code>tick()</code> function (to draw the score on the screen), or inside a reset/init function.<br>
+        <strong>Parameters:</strong> <code>gameName</code> (String).<br>
+        <strong>Returns:</strong> Integer. 0 if no score exists.
+      </p>
+      <p>Example:</p>
+      <pre><code>tick() {
+  const best = Store.scores.get('My Game');
+  ctx.fillText('HI: ' + best, 10, 20);
+}</code></pre>
+
+      <p><strong>Store.scores.submit(gameName, score)</strong></p>
+      <p>
+        <strong>What it is:</strong> Attempts to save a new high score.<br>
+        <strong>Where it must be used:</strong> Inside your game logic when the player dies, loses, or finishes a level. This is usually placed inside <code>tick()</code> within a game-over conditional block.<br>
+        <strong>Parameters:</strong> <code>gameName</code> (String), <code>score</code> (Integer).<br>
+        <strong>Returns:</strong> <code>true</code> if the score was higher than the previous record (useful for triggering a "New Record!" flashing effect), <code>false</code> otherwise.
+      </p>
+      <p>Example:</p>
+      <pre><code>tick() {
+  if (player.dead) {
+    const isNewRecord = Store.scores.submit('My Game', Math.floor(score));
+    if (isNewRecord) flashScreen = true;
+  }
+}</code></pre>
+
+      <h4>4. UI (Window Manager)</h4>
+      <p>The module that handles the visual desktop-style window wrapper.</p>
+      
+      <p><strong>UI.applyCanvasStyle(canvas, aspectRatio, gameName)</strong></p>
+      <p>
+        <strong>What it is:</strong> The function that registers your canvas with the Hub's floating window manager.<br>
+        <strong>Where it must be used:</strong> Inside your factory function, immediately after creating the canvas and setting its width/height, but before returning the game object.<br>
+        <strong>How to use it:</strong> You must call this in your factory function. It reads the user's display settings (window size slider, screen position) and builds the DOM window around your canvas.<br>
+        <strong>Parameters:</strong><br>
+        - <code>canvas</code>: The canvas element you created.<br>
+        - <code>aspectRatio</code>: The width divided by the height (e.g., 400/300 or 1.33). Used to calculate the exact pixel size.<br>
+        - <code>gameName</code>: The name of your game (displayed in the window title bar).
+      </p>
+      <p>Example:</p>
+      <pre><code>function createMyGame() {
+  const c = document.createElement('canvas');
+  c.width = 400; c.height = 300;
+  UI.applyCanvasStyle(c, 400/300, 'My Game'); // MUST BE HERE
+  // ...
+  return { el: c };
+}</code></pre>
+
+      <h4>5. Utils (Math & Rendering Helpers)</h4>
+      <p>A static library of functions to make 2D game development easier.</p>
+      
+      <p><strong>Utils.drawPixels(ctx, x, y, scale, matrix, color)</strong></p>
+      <p>
+        <strong>What it is:</strong> Draws retro pixel art from a 2D array of 1s and 0s.<br>
+        <strong>Where it must be used:</strong> Inside your <code>tick()</code> function, during the draw phase.<br>
+        <strong>How to use it:</strong> Define your sprites as arrays at the top of your factory. 1 means draw a square, 0 means skip. All drawn squares will be the same color.<br>
+        <strong>Parameters:</strong><br>
+        - <code>ctx</code>: Your canvas 2D context.<br>
+        - <code>x, y</code>: The top-left pixel coordinates to start drawing.<br>
+        - <code>scale</code>: The size of each pixel (e.g., 2 means each array cell becomes a 2x2 square).<br>
+        - <code>matrix</code>: The 2D array.<br>
+        - <code>color</code>: The fill style string (e.g., '#ff0000').
+      </p>
+      <p>Example:</p>
+      <pre><code>const PLAYER_SPRITE = [
+  [0,1,0],
+  [1,1,1],
+  [0,1,0]
+];
+tick() {
+  // Draws a 3x3 red cross at top-left
+  Utils.drawPixels(ctx, 0, 0, 2, PLAYER_SPRITE, '#ff0000');
+}</code></pre>
+
+      <p><strong>Utils.drawColorPixels(ctx, x, y, scale, matrix)</strong></p>
+      <p>
+        <strong>What it is:</strong> Draws multi-colored pixel art from a 2D array.<br>
+        <strong>Where it must be used:</strong> Inside your <code>tick()</code> function, during the draw phase.<br>
+        <strong>How to use it:</strong> Instead of 1s and 0s, each cell in the array contains a color string (e.g., '#fff') or 0 (skip).
+      </p>
+      <p>Example:</p>
+      <pre><code>const COIN = [
+  ['#fff', '#fff'],
+  ['#fff', '#ff0']
+];
+tick() {
+  Utils.drawColorPixels(ctx, 10, 10, 4, COIN);
+}</code></pre>
+
+      <p><strong>Utils.rectIntersect(x1, y1, w1, h1, x2, y2, w2, h2)</strong></p>
+      <p>
+        <strong>What it is:</strong> Standard Axis-Aligned Bounding Box (AABB) collision detection.<br>
+        <strong>Where it must be used:</strong> Inside your <code>tick()</code> function, during the physics/update phase (before drawing).<br>
+        <strong>How to use it:</strong> Check if two rectangles overlap (e.g., player hitting an obstacle, bullet hitting an enemy).<br>
+        <strong>Parameters:</strong> <code>x, y</code> (top-left), <code>w, h</code> (width/height) for both Box 1 and Box 2.<br>
+        <strong>Returns:</strong> <code>true</code> if they overlap, <code>false</code> otherwise.
+      </p>
+      <p>Example:</p>
+      <pre><code>tick() {
+  let hit = Utils.rectIntersect(
+    player.x, player.y, 20, 20, // Player box
+    enemy.x, enemy.y, 40, 40    // Enemy box
+  );
+  if (hit) player.dead = true;
+}</code></pre>
+
+      <p><strong>Utils.prettyKey(code)</strong></p>
+      <p>
+        <strong>What it is:</strong> Converts raw browser codes into readable text.<br>
+        <strong>Where it must be used:</strong> Inside your <code>tick()</code> function, usually when drawing "Game Over" text on the screen.<br>
+        <strong>How to use it:</strong> If you want to draw "Press KeyR to Restart" on the screen, raw KeyR looks bad. This converts it to R.<br>
+        <strong>Parameters:</strong> <code>code</code> (String) - Usually <code>KEYS.actionName</code>.<br>
+        <strong>Returns:</strong> Formatted string.
+      </p>
+      <p>Example:</p>
+      <pre><code>tick() {
+  if (isGameOver) {
+    const text = 'Press ' + Utils.prettyKey(KEYS.restart) + ' to Restart';
+    // Returns "Press R to Restart"
+    ctx.fillText(text, 100, 150);
+  }
+}</code></pre>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="hideGuideModal()">Close</button>
+      <button class="btn green" onclick="copyGuide()">Copy Manual to Clipboard</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<!-- The actual, finalized Game Hub Engine Code -->
+<script type="text/plain" id="engineCode">
+/* ════════════════════════════════════════════════════════════════════
+   1. UTILS MODULE
+════════════════════════════════════════════════════════════════════ */
+const Utils = {
+  prettyKey(code) {
+    const MAP = {
+      Space:'SPACE', Enter:'ENTER', Escape:'ESC', Backspace:'BKSP', Tab:'TAB',
+      ArrowUp:'↑', ArrowDown:'↓', ArrowLeft:'←', ArrowRight:'→',
+      ShiftLeft:'SHIFT', ShiftRight:'SHIFT',
+      ControlLeft:'CTRL', ControlRight:'CTRL',
+      AltLeft:'ALT', AltRight:'ALT',
+    };
+    if (MAP[code]) return MAP[code];
+    if (code.startsWith('Key'))    return code.slice(3);
+    if (code.startsWith('Digit'))  return code.slice(5);
+    if (code.startsWith('Numpad')) return 'NP' + code.slice(6);
+    return code;
+  },
+  drawPixels(ctx, ox, oy, sz, m, color) {
+    ctx.fillStyle = color;
+    for (let r = 0; r < m.length; r++) {
+      for (let cl = 0; cl < m[r].length; cl++) {
+        if (m[r][cl] === 1) ctx.fillRect(ox + cl * sz, oy + r * sz, sz, sz);
+      }
+    }
+  },
+  drawColorPixels(ctx, ox, oy, sz, m) {
+    for (let r = 0; r < m.length; r++) {
+      for (let cl = 0; cl < m[r].length; cl++) {
+        if (m[r][cl]) {
+          ctx.fillStyle = m[r][cl];
+          ctx.fillRect(ox + cl * sz, oy + r * sz, sz, sz);
+        }
+      }
+    }
+  },
+  rectIntersect(x1, y1, w1, h1, x2, y2, w2, h2) {
+    return x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + w2 && y1 + h1 > y2;
+  }
+};
+
+/* ════════════════════════════════════════════════════════════════════
+   2. STORE MODULE
+════════════════════════════════════════════════════════════════════ */
+const Store = {
+  scores: {
+    _key: 'gamehub_hi',
+    get(game) { return JSON.parse(localStorage.getItem(this._key) || '{}')[game] || 0; },
+    submit(game, val) {
+      const all = JSON.parse(localStorage.getItem(this._key) || '{}');
+      if (val > (all[game] || 0)) {
+        all[game] = val;
+        localStorage.setItem(this._key, JSON.stringify(all));
+        return true;
+      }
+      return false;
+    }
+  },
+  bindings: {
+    _key: 'gamehub_bindings',
+    _defs: {},
+    _all() { return JSON.parse(localStorage.getItem(this._key) || '{}'); },
+    register(game, controls) { this._defs[game] = controls; },
+    resolve(game) {
+      const defs = this._defs[game] || {};
+      const stored = this._all()[game] || {};
+      const out = {};
+      for (const action in defs) out[action] = stored[action] || defs[action].default;
+      return out;
+    },
+    set(game, action, code) {
+      const all = this._all();
+      if (!all[game]) all[game] = {};
+      all[game][action] = code;
+      localStorage.setItem(this._key, JSON.stringify(all));
+    },
+    reset(game) {
+      const all = this._all();
+      delete all[game];
+      localStorage.setItem(this._key, JSON.stringify(all));
+    }
+  },
+  layout: {
+    _key: 'gamehub_layout',
+    _default: { width: 400, position: 'bottom-left' },
+    get() { try { return JSON.parse(localStorage.getItem(this._key)) || this._default; } catch(e) { return this._default; } },
+    set(width, pos) {
+      const cur = this.get();
+      if (width !== null) cur.width = width;
+      if (pos !== null) cur.position = pos;
+      localStorage.setItem(this._key, JSON.stringify(cur));
+      if (UI._winEl && Hub._game && Hub._game.el && Hub._game.el._aspectRatio) {
+        UI.applyCanvasStyle(Hub._game.el, Hub._game.el._aspectRatio, Hub._game.el._gameName);
+      }
+    }
+  }
+};
+
+/* ════════════════════════════════════════════════════════════════════
+   3. UI MODULE
+════════════════════════════════════════════════════════════════════ */
+const UI = {
+  _menuEl: null,
+  _winEl: null,
+  _hidden: false,
+
+  makePanel(id, width, height) {
+    const p = document.createElement('div');
+    p.id = id;
+    Object.assign(p.style, {
+      position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
+      background:'#121212', color:'#e0e0e0', padding:'48px 24px 24px 24px', borderRadius:'8px',
+      boxShadow:'0 12px 40px rgba(0,0,0,0.9)', zIndex:'9999999',
+      fontFamily:'Trebuchet MS, system-ui, sans-serif', textAlign:'center', 
+      width:(width || '640px'), height:(height || '480px'),
+      border:'1px solid #333', overflow:'hidden', boxSizing:'border-box',
+    });
+    return p;
+  },
+
+  applyCanvasStyle(canvas, aspectRatio, gameName) {
+    canvas._aspectRatio = aspectRatio;
+    canvas._gameName = gameName;
+
+    const oldWin = document.getElementById('hub-game-window');
+    if (oldWin) oldWin.remove();
+
+    const layout = Store.layout.get();
+    const diag = layout.width;
+    const cH = Math.round(diag / Math.sqrt(aspectRatio * aspectRatio + 1));
+    const cW = Math.round(cH * aspectRatio);
+    const w = cW;
+    const h = cH + 28;
+    const pos = layout.position.split('-');
+    const vPos = pos[0], hPos = pos[1];
+    
+    const win = document.createElement('div');
+    win.id = 'hub-game-window';
+    this._winEl = win;
+
+    const styles = {
+      position: 'fixed', width: w + 'px', height: h + 'px',
+      background: '#000', border: '1px solid #333', borderRadius: '8px',
+      boxShadow: '0 12px 40px rgba(0,0,0,0.9)', zIndex: '999999', margin: '0',
+      top: 'auto', bottom: 'auto', left: 'auto', right: 'auto', transform: 'none',
+      overflow: 'hidden', display: 'flex', flexDirection: 'column'
+    };
+
+    if (vPos === 'top') styles.top = '20px';
+    if (vPos === 'bottom') styles.bottom = '20px';
+    if (vPos === 'center') { styles.top = '50%'; styles.transform = 'translateY(-50%)'; }
+    if (hPos === 'left') styles.left = '20px';
+    if (hPos === 'right') styles.right = '20px';
+    if (hPos === 'center') {
+      styles.left = '50%';
+      styles.transform = (vPos === 'center') ? 'translate(-50%, -50%)' : 'translateX(-50%)';
+    }
+    Object.assign(win.style, styles);
+
+    const titleBar = document.createElement('div');
+    Object.assign(titleBar.style, {
+      height: '28px', background: '#0a0a0a', borderBottom: '1px solid #222',
+      display: 'flex', alignItems: 'center', paddingLeft: '12px', paddingRight: '8px', 
+      boxSizing: 'border-box', fontFamily: 'Trebuchet MS, system-ui, sans-serif', flexShrink: '0'
+    });
+
+    const title = document.createElement('div');
+    title.textContent = gameName;
+    title.style.cssText = 'color:#888; font-size:12px; font-weight:bold; text-transform:uppercase; letter-spacing:2px; pointer-events:none; flex:1;';
+    
+    const rightCtrl = document.createElement('div');
+    Object.assign(rightCtrl.style, { display:'flex', gap:'12px', alignItems:'center' });
+
+    const mkWinBtn = (html, hoverColor, onClick) => {
+      const btn = document.createElement('button');
+      btn.innerHTML = html;
+      Object.assign(btn.style, {
+        background:'none', border:'none', color:'#888', fontSize:'20px', cursor:'pointer',
+        padding:'0', fontFamily:'inherit', transition:'color 0.1s', fontWeight:'bold', lineHeight:'1'
+      });
+      btn.onmouseover = () => btn.style.color = hoverColor;
+      btn.onmouseout  = () => btn.style.color = '#888';
+      btn.onclick = onClick;
+      return btn;
+    };
+
+    rightCtrl.appendChild(mkWinBtn('←', '#ff3333', () => { Hub.stop(); UI.showMenu(); }));
+    rightCtrl.appendChild(mkWinBtn('—', '#ff3333', () => UI.toggleHide()));
+    rightCtrl.appendChild(mkWinBtn('✕', '#ff4c4c', () => Hub.stop()));
+
+    titleBar.appendChild(title);
+    titleBar.appendChild(rightCtrl);
+    win.appendChild(titleBar);
+
+    canvas.style.width = '100%';
+    canvas.style.height = 'calc(100% - 28px)';
+    canvas.style.display = 'block';
+    canvas.style.border = 'none';
+    canvas.style.borderRadius = '0 0 8px 8px';
+    
+    win.appendChild(canvas);
+    document.body.appendChild(win);
+  },
+
+  toggleHide() {
+    this._hidden = !this._hidden;
+    const v = this._hidden ? 'none' : '';
+    if (this._menuEl) this._menuEl.style.display = v;
+    if (this._winEl) this._winEl.style.display = v;
+    if (this._hidden) Hub.pause(); else Hub.resume();
+  },
+
+  showMenu() {
+    let menu = document.getElementById('game-hub-panel');
+    if (!menu) {
+      menu = this.makePanel('game-hub-panel', '640px', '480px');
+      document.body.appendChild(menu);
+    }
+    menu.innerHTML = '';
+    menu.style.display = 'flex';
+    menu.style.flexDirection = 'column';
+    this._menuEl = menu;
+
+    const settingsBtn = document.createElement('button');
+    settingsBtn.innerHTML = '⚙';
+    Object.assign(settingsBtn.style, {
+      position:'absolute', top:'16px', left:'20px', background:'none', border:'none',
+      color:'#888', fontSize:'24px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
+      fontFamily:'Trebuchet MS, system-ui, sans-serif', transition:'color 0.1s'
+    });
+    settingsBtn.onmouseover = () => settingsBtn.style.color = '#ff3333';
+    settingsBtn.onmouseout  = () => settingsBtn.style.color = '#888';
+    settingsBtn.onclick = () => this.showSettings();
+    menu.appendChild(settingsBtn);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.innerHTML = '✕';
+    Object.assign(closeBtn.style, {
+      position:'absolute', top:'16px', right:'20px', background:'none', border:'none',
+      color:'#888', fontSize:'26px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
+      fontFamily:'Trebuchet MS, system-ui, sans-serif', fontWeight:'bold', transition:'color 0.1s'
+    });
+    closeBtn.onmouseover = () => closeBtn.style.color = '#ff4c4c';
+    closeBtn.onmouseout  = () => closeBtn.style.color = '#888';
+    closeBtn.onclick = () => { menu.remove(); this._menuEl=null; };
+    menu.appendChild(closeBtn);
+
+    const ttl = document.createElement('h2');
+    ttl.innerText = 'GAME HUB';
+    ttl.style.cssText = 'margin:0 0 8px 0;color:#fff;font-size:28px;text-transform:uppercase;letter-spacing:4px;font-weight:bold';
+    menu.appendChild(ttl);
+    
+    const sub = document.createElement('div');
+    sub.innerText = 'SELECT A GAME';
+    sub.style.cssText = 'color:#ff3333;font-size:12px;text-transform:uppercase;letter-spacing:2px;margin-bottom:28px';
+    menu.appendChild(sub);
+
+    const grid = document.createElement('div');
+    Object.assign(grid.style, { display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'16px', flex:'1', overflow:'hidden' });
+
+    Games.forEach(g => {
+      const tile = document.createElement('div');
+      const best = Store.scores.get(g.name);
+      Object.assign(tile.style, {
+        background:'#0a0a0a', border:'1px solid #222', borderRadius:'8px',
+        cursor:'pointer', position:'relative', aspectRatio:'1 / 1', overflow:'hidden', transition:'border-color 0.1s'
+      });
+
+      const screen = document.createElement('div');
+      Object.assign(screen.style, {
+        background:'#121212', position:'absolute', top:'6px', left:'6px', right:'6px', bottom:'36px',
+        display:'flex', justifyContent:'center', alignItems:'center', borderRadius:'6px', transition:'all 0.2s', zIndex:'0'
+      });
+
+      const iconWrap = document.createElement('div');
+      iconWrap.style.cssText = 'width:60%;height:60%;display:flex;align-items:center;justify-content:center;opacity:0.8;transition:all 0.2s';
+      
+      if (g.icon) {
+        if (g.icon.startsWith('data:image')) {
+          const img = document.createElement('img');
+          img.src = g.icon;
+          img.style.cssText = 'width:100%;height:100%;object-fit:contain;';
+          iconWrap.appendChild(img);
+        } else {
+          // Use DOMParser to correctly apply the SVG namespace
+          try {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(g.icon, "image/svg+xml");
+            const svg = doc.querySelector('svg');
+            if (svg) {
+              svg.setAttribute('width', '100%'); 
+              svg.setAttribute('height', '100%'); 
+              svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+              svg.style.display = 'block';
+              iconWrap.appendChild(svg);
+            }
+          } catch(e) {
+            iconWrap.innerHTML = 'SVG Err';
+          }
+        }
+      } else {
+        const name = document.createElement('div');
+        name.textContent = g.name.split(' ').map(w=>w[0]).join('').substring(0,2);
+        name.style.cssText = 'font-size:32px;color:#ff3333;font-weight:bold;transition:all 0.2s';
+        iconWrap.appendChild(name);
+      }
+      screen.appendChild(iconWrap);
+
+      const infoContainer = document.createElement('div');
+      Object.assign(infoContainer.style, {
+        position:'absolute', bottom:'0', left:'0', right:'0', height:'36px',
+        display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center',
+        transition:'opacity 0.1s', zIndex:'1'
+      });
+
+      const title = document.createElement('div');
+      title.textContent = g.name;
+      title.style.cssText = 'font-size:12px;font-weight:bold;color:#e0e0e0;text-transform:uppercase;letter-spacing:1px;text-align:center;padding:0 8px';
+      
+      const score = document.createElement('div');
+      score.style.cssText = 'font-size:10px;color:#888;text-align:center;margin-top:2px';
+      score.textContent = best ? 'Best: ' + best : '—';
+
+      infoContainer.appendChild(title);
+      infoContainer.appendChild(score);
+      tile.appendChild(screen);
+      tile.appendChild(infoContainer);
+
+      tile.onmouseover = () => {
+        tile.style.borderColor='#ff3333';
+        Object.assign(screen.style, {top:'0px',left:'0px',right:'0px',bottom:'0px',borderRadius:'0px'});
+        infoContainer.style.opacity='0';
+        Object.assign(iconWrap.style, {width:'85%',height:'85%',opacity:'1'});
+      };
+      tile.onmouseout = () => {
+        tile.style.borderColor='#222';
+        Object.assign(screen.style, {top:'6px',left:'6px',right:'6px',bottom:'36px',borderRadius:'6px'});
+        infoContainer.style.opacity='1';
+        Object.assign(iconWrap.style, {width:'60%',height:'60%',opacity:'0.8'});
+      };
+      tile.onclick = () => { menu.style.display = 'none'; Hub.launch(g.factory()); };
+      grid.appendChild(tile);
+    });
+    menu.appendChild(grid);
+  },
+
+  showSettings() {
+    let panel = document.getElementById('game-hub-panel');
+    if (!panel) {
+      panel = this.makePanel('game-hub-panel', '640px', '480px');
+      document.body.appendChild(panel);
+    }
+    panel.innerHTML = '';
+    panel.style.display = 'flex';
+    panel.style.flexDirection = 'column';
+    this._menuEl = panel;
+
+    const backBtn = document.createElement('button');
+    backBtn.innerHTML = '←';
+    Object.assign(backBtn.style, {
+      position:'absolute', top:'16px', left:'20px', background:'none', border:'none',
+      color:'#888', fontSize:'26px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
+      fontFamily:'Trebuchet MS, system-ui, sans-serif', transition:'color 0.1s'
+    });
+    backBtn.onmouseover = () => backBtn.style.color = '#ff3333';
+    backBtn.onmouseout  = () => backBtn.style.color = '#888';
+    backBtn.onclick = () => { Hub._rebinding=null; this.showMenu(); };
+    panel.appendChild(backBtn);
+
+    const ttl = document.createElement('h2');
+    ttl.innerText = '⚙ SETTINGS';
+    ttl.style.cssText = 'margin:0 0 20px 0;color:#fff;font-size:28px;text-transform:uppercase;letter-spacing:4px;font-weight:bold';
+    panel.appendChild(ttl);
+
+    const contentRow = document.createElement('div');
+    Object.assign(contentRow.style, { display:'flex', flex:'1', gap:'24px', overflow:'hidden', borderTop:'1px solid #333', paddingTop:'20px' });
+
+    const sidebar = document.createElement('div');
+    Object.assign(sidebar.style, { width:'120px', display:'flex', flexDirection:'column', gap:'8px', borderRight:'1px solid #333', paddingRight:'16px' });
+
+    const tabs = [{ name: 'display', label: 'Display' }, { name: 'controls', label: 'Controls' }];
+    const displayTab = document.createElement('div');
+    Object.assign(displayTab.style, { display:'none', flex:'1', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:'32px' });
+    
+    if (!document.getElementById('hub-scroll-style')) {
+      const style = document.createElement('style');
+      style.id = 'hub-scroll-style';
+      style.innerHTML = '.hub-scroll::-webkit-scrollbar { width: 8px; } .hub-scroll::-webkit-scrollbar-track { background: #0a0a0a; } .hub-scroll::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; } .hub-scroll::-webkit-scrollbar-thumb:hover { background: #ff3333; } .hub-scroll { scrollbar-width: thin; scrollbar-color: #333 #0a0a0a; }';
+      document.head.appendChild(style);
+    }
+
+    const controlsTab = document.createElement('div');
+    controlsTab.classList.add('hub-scroll');
+    Object.assign(controlsTab.style, { display:'none', flex:'1', width:'100%', overflowY:'auto', paddingRight: '8px', boxSizing: 'border-box' });
+
+    tabs.forEach(t => {
+      const btn = document.createElement('button');
+      btn.textContent = t.label;
+      btn.dataset.tab = t.name;
+      Object.assign(btn.style, {
+        textAlign:'left', background:'none', border:'none', color:'#888',
+        fontSize:'16px', cursor:'pointer', padding:'10px 12px', borderRadius:'6px',
+        fontFamily:'inherit', transition:'all 0.1s', width:'100%'
+      });
+      btn.onclick = () => {
+        tabs.forEach(tt => {
+          const b = sidebar.querySelector(`button[data-tab="${tt.name}"]`);
+          b.style.background = 'none'; b.style.color = '#888';
+        });
+        btn.style.background = '#1e1e1e'; btn.style.color = '#fff';
+        displayTab.style.display = t.name === 'display' ? 'flex' : 'none';
+        controlsTab.style.display = t.name === 'controls' ? 'block' : 'none';
+      };
+      sidebar.appendChild(btn);
+    });
+
+    // Display Tab Content
+    const currentLayout = Store.layout.get();
+    const sizeBox = document.createElement('div');
+    sizeBox.style.cssText = 'width:80%; text-align:center;';
+    const sizeLabel = document.createElement('div');
+    sizeLabel.textContent = 'DIAG SIZE: ' + currentLayout.width + 'px';
+    sizeLabel.style.cssText = 'font-size:14px;color:#ff3333;margin-bottom:12px;text-transform:uppercase;letter-spacing:1px;font-weight:bold';
+    const slider = document.createElement('input');
+    slider.type = 'range'; slider.min = '200'; slider.max = '500'; slider.value = currentLayout.width; slider.step = '10';
+    Object.assign(slider.style, { width:'100%', cursor:'pointer', accentColor:'#ff3333' });
+    slider.oninput = (e) => {
+      const val = parseInt(e.target.value);
+      sizeLabel.textContent = 'DIAG SIZE: ' + val + 'px';
+      Store.layout.set(val, null);
+    };
+    sizeBox.appendChild(sizeLabel);
+    sizeBox.appendChild(slider);
+    displayTab.appendChild(sizeBox);
+
+    const posBox = document.createElement('div');
+    posBox.style.cssText = 'text-align:center;';
+    const posLabel = document.createElement('div');
+    posLabel.textContent = 'POSITION';
+    posLabel.style.cssText = 'font-size:14px;color:#ff3333;margin-bottom:12px;text-transform:uppercase;letter-spacing:1px;font-weight:bold';
+    const posGrid = document.createElement('div');
+    Object.assign(posGrid.style, { display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'6px', width:'120px', height:'120px', margin:'0 auto' });
+    const positions = ['top-left','top-center','top-right','center-left','center-center','center-right','bottom-left','bottom-center','bottom-right'];
+    positions.forEach(p => {
+      const btn = document.createElement('button');
+      Object.assign(btn.style, {
+        background: currentLayout.position === p ? '#ff3333' : '#1e1e1e',
+        border: '1px solid #333', borderRadius: '6px', cursor:'pointer', padding:'0', transition:'all 0.1s'
+      });
+      btn.onmouseover = () => { if (currentLayout.position !== p) btn.style.background = '#252525'; };
+      btn.onmouseout = () => { if (currentLayout.position !== p) btn.style.background = '#1e1e1e'; };
+      btn.onclick = () => { Store.layout.set(null, p); this.showSettings(); };
+      posGrid.appendChild(btn);
+    });
+    posBox.appendChild(posLabel);
+    posBox.appendChild(posGrid);
+    displayTab.appendChild(posBox);
+
+    // Controls Tab Content
+    const controlsHeader = document.createElement('div');
+    controlsHeader.textContent = 'Click a key to rebind. Changes apply on next launch.';
+    controlsHeader.style.cssText = 'font-size:12px;color:#888;margin:0 0 16px 0;text-transform:uppercase;letter-spacing:1px;text-align:center';
+    controlsTab.appendChild(controlsHeader);
+
+    const ctrlGrid = document.createElement('div');
+    Object.assign(ctrlGrid.style, { display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:'12px', textAlign:'left' });
+
+    Games.forEach(g => {
+      const defs = Store.bindings._defs[g.name];
+      if (!Object.keys(defs).length) return;
+      const gameBox = document.createElement('div');
+      Object.assign(gameBox.style, { background:'#0a0a0a', border:'1px solid #222', borderRadius:'8px', padding:'10px', position:'relative', display:'flex', flexDirection:'column', gap:'6px' });
+
+      const rst = document.createElement('button');
+      rst.innerHTML = '↺';
+      Object.assign(rst.style, { position:'absolute', top:'6px', right:'10px', background:'none', border:'none', color:'#444', fontSize:'16px', cursor:'pointer', padding:'0', fontFamily:'Trebuchet MS, system-ui, sans-serif', transition:'color 0.1s' });
+      rst.onmouseover = () => rst.style.color = '#ff4c4c';
+      rst.onmouseout  = () => rst.style.color = '#444';
+      rst.onclick = () => { Store.bindings.reset(g.name); this.showSettings(); };
+      gameBox.appendChild(rst);
+
+      const hdr = document.createElement('div');
+      hdr.textContent = g.name;
+      hdr.style.cssText = 'font-size:12px;color:#ff3333;text-align:left;margin:0 0 4px 0;letter-spacing:1px;text-transform:uppercase;font-weight:bold;border-bottom:1px solid #222;padding-bottom:6px;';
+      gameBox.appendChild(hdr);
+
+      const resolved = Store.bindings.resolve(g.name);
+      for (const action in defs) {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:8px;';
+        const lbl = document.createElement('span');
+        lbl.textContent = defs[action].label;
+        lbl.style.cssText = 'font-size:10px;color:#888;text-align:left;text-transform:uppercase;letter-spacing:1px;line-height:1.2;';
+        const keyBtn = document.createElement('button');
+        keyBtn.textContent = Utils.prettyKey(resolved[action]);
+        Object.assign(keyBtn.style, {
+          background:'#1e1e1e', color:'#e0e0e0', border:'1px solid #333', borderRadius:'4px', padding:'3px 8px', cursor:'pointer',
+          fontFamily:'Trebuchet MS, system-ui, sans-serif', fontSize:'11px', minWidth:'50px', textTransform:'uppercase', fontWeight:'bold', transition:'background 0.1s, border-color 0.1s', textAlign:'center'
+        });
+        keyBtn.onmouseover = () => { if (!Hub._rebinding) { keyBtn.style.borderColor='#ff3333'; keyBtn.style.background='#252525'; } };
+        keyBtn.onmouseout  = () => { if (!Hub._rebinding) { keyBtn.style.borderColor='#333'; keyBtn.style.background='#1e1e1e'; } };
+        keyBtn.onclick = () => {
+          if (Hub._rebinding) return;
+          keyBtn.textContent = '...';
+          Object.assign(keyBtn.style, { background:'#ff3333', color:'#000', borderColor:'#ff3333' });
+          Hub._rebinding = code => {
+            Store.bindings.set(g.name, action, code);
+            keyBtn.textContent = Utils.prettyKey(code);
+            Object.assign(keyBtn.style, { background:'#1e1e1e', color:'#e0e0e0', borderColor:'#333' });
+            Hub._rebinding = null;
+          };
+        };
+        row.appendChild(lbl);
+        row.appendChild(keyBtn);
+        gameBox.appendChild(row);
+      }
+      ctrlGrid.appendChild(gameBox);
+    });
+    controlsTab.appendChild(ctrlGrid);
+
+    contentRow.appendChild(sidebar);
+    contentRow.appendChild(displayTab);
+    contentRow.appendChild(controlsTab);
+    panel.appendChild(contentRow);
+    sidebar.querySelector('button[data-tab="display"]').click();
+  }
+};
+
+/* ════════════════════════════════════════════════════════════════════
+   4. HUB CORE MODULE
+════════════════════════════════════════════════════════════════════ */
+const Hub = window.GameHub = {
+  _IV: 1000 / 60,
+  _last: 0, _accum: 0, _raf: null, _game: null,
+  _debug: false, _rebinding: null, keys: {},
+
+  init() {
+    // Checks if all keys in the combo string are currently held down in Hub.keys
+    const checkCombo = (comboStr) => {
+      if (!comboStr) return false;
+      const parts = comboStr.split('+');
+      for (let p of parts) {
+        if (!this.keys[p]) return false;
+      }
+      return true;
+    };
+    
+    window.addEventListener('keydown', e => {
+      this.keys[e.code] = true;
+      // Ignore key repeat so it only triggers once per press
+      if (!e.repeat) {
+        if (checkCombo(HUB_KEYS.hide) && !UI._hidden) { UI.toggleHide(); return; }
+        if (checkCombo(HUB_KEYS.show) && UI._hidden) { UI.toggleHide(); return; }
+        if (checkCombo(HUB_KEYS.debug)) { e.preventDefault(); this._debug = !this._debug; return; }
+      }
+      if (this._rebinding)     { this._rebinding(e.code); return; }
+      if (this._game && this._game.onKey) this._game.onKey(e.code);
+    });
+    window.addEventListener('keyup', e => { this.keys[e.code] = false; });
+  },
+
+  pause() { if (this._raf) { cancelAnimationFrame(this._raf); this._raf = null; } },
+  resume() {
+    if (this._game && !this._raf) {
+      this._accum = 0; this._last = performance.now();
+      this._raf = requestAnimationFrame(t => this._loop(t));
+    }
+  },
+
+  _loop(now) {
+    this._raf = requestAnimationFrame(t => this._loop(t));
+    const dt = Math.min(now - this._last, 100);
+    this._last = now; this._accum += dt;
+    while (this._accum >= this._IV) {
+      if (this._game) this._game.tick();
+      this._accum -= this._IV;
+    }
+  },
+
+  launch(game) {
+    this.stop();
+    this._game = game;
+    if (game.el) {
+      if (!document.getElementById('hub-game-window')) {
+        UI.applyCanvasStyle(game.el, game.el._aspectRatio, game.el._gameName);
+      }
+      if (UI._winEl) UI._winEl.style.display = UI._hidden ? 'none' : '';
+    }
+    this._accum = 0; this._last = performance.now();
+    this._raf = requestAnimationFrame(t => this._loop(t));
+  },
+
+  stop() {
+    if (this._raf) { cancelAnimationFrame(this._raf); this._raf = null; }
+    if (this._game && this._game.destroy) this._game.destroy();
+    this._game = null;
+    if (UI._winEl) { UI._winEl.remove(); UI._winEl = null; }
+  }
+};
+</script>
+
+<script>
+// --- MOCK WEBSITE ---
+const MOCK_WEBSITE = `
+<!DOCTYPE html><html><head><style>
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f0f2f5; margin: 0; padding: 40px; color: #1c1e21; min-height: 150vh; }
+  .container { max-width: 680px; margin: 0 auto; background: #fff; padding: 40px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  h1 { color: #1877f2; margin-top: 0; } p { line-height: 1.6; font-size: 16px; }
+  code { background: #eee; padding: 2px 6px; border-radius: 4px; font-family: monospace; }
+</style></head><body>
+  <div class="container">
+    <h1>Welcome to Example.com</h1>
+    <p>This is a simulation of a real web page. The Game Hub bookmarklet has been injected into this page. The Hub UI elements (menu and game window) should float over this content using <code>position: fixed</code>.</p>
+    <p>Use the toolbar at the top right to return to the compiler IDE.</p>
+    <p style="margin-top: 40px; color: #65676b;">Scroll down to test fixed positioning...<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>End of page.</p>
+  </div>
+</body></html>
+`;
+
+// --- STATE MANAGEMENT ---
+let modules = JSON.parse(localStorage.getItem('hub_modules_v2') || '[]');
+let activeModuleIndex = -1;
+let currentView = 'code'; 
+let compilerRebinding = null; 
+
+if (modules.length === 0) {
+  modules.push({
+    name: 'Test Box',
+    code: `function createTestBox() {
+  const KEYS = Store.bindings.resolve('Test Box');
+  const c = document.createElement('canvas');
+  c.width=300; c.height=200;
+  const ctx = c.getContext('2d');
+  UI.applyCanvasStyle(c, 300/200, 'Test Box');
+  let x = 50;
+  return {
+    el: c,
+    onKey(code){ if(code === KEYS.reset) x = 50; },
+    tick() {
+      ctx.fillStyle = '#000'; ctx.fillRect(0,0,300,200);
+      x += 2; if(x > 300) x = 0;
+      ctx.fillStyle = '#0f0'; ctx.fillRect(x, 80, 40, 40);
+    },
+    destroy() { c.remove(); }
+  };
+}`,
+    icon: '',
+    bindings: { 
+      reset: { label: 'Reset', default: 'KeyR' } 
+    }
+  });
+}
+
+// --- TOAST NOTIFICATIONS ---
+function showToast(msg, type = 'success') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = 'toast' + (type === 'error' ? ' error' : '');
+  toast.innerText = msg;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+// --- MODALS ---
+function showNewGameModal() {
+  document.getElementById('newGameModal').style.display = 'flex';
+  document.getElementById('newGameName').value = '';
+  setTimeout(() => document.getElementById('newGameName').focus(), 100);
+}
+function hideNewGameModal() {
+  document.getElementById('newGameModal').style.display = 'none';
+}
+function createNewGame() {
+  const name = document.getElementById('newGameName').value.trim() || 'New Game';
+  const safeName = name.replace(/[^a-zA-Z0-9]/g, '');
+  modules.push({ 
+    name: name, 
+    code: `function create${safeName}() {\n  const KEYS = Store.bindings.resolve('${name}');\n  const c = document.createElement('canvas');\n  c.width = 400; c.height = 300;\n  const ctx = c.getContext('2d');\n  UI.applyCanvasStyle(c, 400/300, '${name}');\n\n  // return { el, onKey, tick, destroy }\n}`, 
+    icon: '',
+    bindings: {} 
+  });
+  saveModules();
+  renderFileTree();
+  selectModule(modules.length - 1);
+  hideNewGameModal();
+  showToast(`Module '${name}' created`);
+}
+
+function showGuideModal() {
+  document.getElementById('guideModal').style.display = 'flex';
+}
+function hideGuideModal() {
+  document.getElementById('guideModal').style.display = 'none';
+}
+function copyGuide() {
+  const guideText = `This explains exactly what every command does, why it exists, and exactly where in your code it must be used for the engine to function correctly.
+
+1. The Game Object Contract
+Your factory function (e.g., function createMyGame()) must return an object with these four properties. The Hub engine uses this object to interface with your game.
+
+el (HTMLCanvasElement)
+What it is: The DOM canvas element where your game renders.
+Where it must be used: Returned at the very end of your factory function inside the returned object.
+How to use it: Create a canvas, configure its internal resolution (width/height), and pass it to UI.applyCanvasStyle(). Finally, return it as el. Do not append it to document.body yourself; the Hub handles that.
+Example:
+const c = document.createElement('canvas');
+c.width = 400; c.height = 300;
+UI.applyCanvasStyle(c, 400/300, 'My Game');
+return { el: c, /* ... */ };
+
+onKey(code) (Function)
+What it is: An event listener fired exactly once when a key is pressed down.
+Where it must be used: Returned as a method in the factory function's object.
+How to use it: Use this for one-shot, discrete actions like jumping, shooting a bullet, or restarting the game after a Game Over. Do not use it for continuous movement (like walking), because it only fires once per keypress.
+Parameters: code (String) - The raw KeyboardEvent.code (e.g., 'Space', 'KeyW'). You should compare this against your resolved KEYS object.
+Example:
+return {
+  // ...
+  onKey(code) {
+    if (code === KEYS.jump) { player.vy = -10; }
+    if (code === KEYS.restart && isGameOver) { resetGame(); }
+  }
+};
+
+tick() (Function)
+What it is: The main update loop, called exactly 60 times per second.
+Where it must be used: Returned as a method in the factory function's object.
+How to use it: This is the heart of your game. Put all physics calculations, enemy AI, collision detection, and canvas drawing (ctx.fillRect, etc.) inside this function. The Hub uses a fixed timestep accumulator, so this will run smoothly even on 144Hz monitors.
+Example:
+return {
+  // ...
+  tick() {
+    // 1. Update Physics
+    player.x += player.vx;
+    // 2. Check Input (held down)
+    if (Hub.keys[KEYS.moveRight]) player.vx = 5;
+    // 3. Draw to canvas
+    ctx.clearRect(0, 0, 400, 300);
+    ctx.fillRect(player.x, player.y, 20, 20);
+  }
+};
+
+destroy() (Function)
+What it is: The cleanup function, called when the user closes or stops your game.
+Where it must be used: Returned as a method in the factory function's object.
+How to use it: You must remove your canvas from the DOM. If you added any event listeners to the window (e.g., for mouse tracking), you must remove them here to prevent memory leaks.
+Example:
+return {
+  // ...
+  destroy() {
+    c.remove(); // Remove canvas
+    window.removeEventListener('mousemove', onMouseMove); // Clean up custom listeners
+  }
+};
+
+2. Hub (Core Engine & Input)
+The central engine object. As a game developer, you primarily use it to check held-down key states.
+
+Hub.keys (Object Property)
+What it is: A live, read-only object mapping KeyboardEvent.code strings to booleans (true if held down, false or undefined if released).
+Where it must be used: Inside your tick() function. Do not use it in onKey().
+How to use it: Check this for continuous actions (like walking, running, or holding down a throttle). Always access it using your resolved KEYS object so custom user keybinds work.
+Example:
+tick() {
+  if (Hub.keys[KEYS.moveLeft]) player.x -= 5;
+  if (Hub.keys[KEYS.moveRight]) player.x += 5;
+}
+(Note: Hub.launch, Hub.stop, Hub.pause, Hub.resume are internal engine functions used by the UI/Compiler to manage game lifecycles. You should never call them directly from inside your game).
+
+3. Store (Persistence & Bindings)
+Handles all localStorage data. Use this to save high scores and get the user's customized keybinds.
+
+Store.bindings.resolve(gameName)
+What it is: Fetches the user's current keybinds for your game.
+Where it must be used: At the very top of your factory function, before returning the game object.
+How to use it: Call this once, storing the result in a const KEYS. It merges the default controls you set in the Compiler Config tab with any custom overrides the user set in the Settings UI. Because it is declared at the top of the factory, KEYS will be in scope for your onKey() and tick() methods.
+Parameters: gameName (String) - The exact name of your game module.
+Returns: An object like { jump: 'Space', restart: 'KeyR' }.
+Example:
+function createMyGame() {
+  const KEYS = Store.bindings.resolve('My Game'); // MUST BE HERE
+  const c = document.createElement('canvas');
+  // ...
+  return {
+    el: c,
+    onKey(code) { if (code === KEYS.jump) { /* ... */ } },
+    // ...
+  };
+}
+
+Store.scores.get(gameName)
+What it is: Retrieves the saved high score.
+Where it must be used: Usually inside your tick() function (to draw the score on the screen), or inside a reset/init function.
+Parameters: gameName (String).
+Returns: Integer. 0 if no score exists.
+Example:
+tick() {
+  const best = Store.scores.get('My Game');
+  ctx.fillText('HI: ' + best, 10, 20);
+}
+
+Store.scores.submit(gameName, score)
+What it is: Attempts to save a new high score.
+Where it must be used: Inside your game logic when the player dies, loses, or finishes a level. This is usually placed inside tick() within a game-over conditional block.
+Parameters: gameName (String), score (Integer).
+Returns: true if the score was higher than the previous record (useful for triggering a "New Record!" flashing effect), false otherwise.
+Example:
+tick() {
+  if (player.dead) {
+    const isNewRecord = Store.scores.submit('My Game', Math.floor(score));
+    if (isNewRecord) flashScreen = true;
+  }
+}
+
+4. UI (Window Manager)
+The module that handles the visual desktop-style window wrapper.
+
+UI.applyCanvasStyle(canvas, aspectRatio, gameName)
+What it is: The function that registers your canvas with the Hub's floating window manager.
+Where it must be used: Inside your factory function, immediately after creating the canvas and setting its width/height, but before returning the game object.
+How to use it: You must call this in your factory function. It reads the user's display settings (window size slider, screen position) and builds the DOM window around your canvas.
+Parameters:
+- canvas: The canvas element you created.
+- aspectRatio: The width divided by the height (e.g., 400/300 or 1.33). Used to calculate the exact pixel size.
+- gameName: The name of your game (displayed in the window title bar).
+Example:
+function createMyGame() {
+  const c = document.createElement('canvas');
+  c.width = 400; c.height = 300;
+  UI.applyCanvasStyle(c, 400/300, 'My Game'); // MUST BE HERE
+  // ...
+  return { el: c };
+}
+
+5. Utils (Math & Rendering Helpers)
+A static library of functions to make 2D game development easier.
+
+Utils.drawPixels(ctx, x, y, scale, matrix, color)
+What it is: Draws retro pixel art from a 2D array of 1s and 0s.
+Where it must be used: Inside your tick() function, during the draw phase.
+How to use it: Define your sprites as arrays at the top of your factory. 1 means draw a square, 0 means skip. All drawn squares will be the same color.
+Parameters:
+- ctx: Your canvas 2D context.
+- x, y: The top-left pixel coordinates to start drawing.
+- scale: The size of each pixel (e.g., 2 means each array cell becomes a 2x2 square).
+- matrix: The 2D array.
+- color: The fill style string (e.g., '#ff0000').
+Example:
+const PLAYER_SPRITE = [
+  [0,1,0],
+  [1,1,1],
+  [0,1,0]
+];
+tick() {
+  // Draws a 3x3 red cross at top-left
+  Utils.drawPixels(ctx, 0, 0, 2, PLAYER_SPRITE, '#ff0000');
+}
+
+Utils.drawColorPixels(ctx, x, y, scale, matrix)
+What it is: Draws multi-colored pixel art from a 2D array.
+Where it must be used: Inside your tick() function, during the draw phase.
+How to use it: Instead of 1s and 0s, each cell in the array contains a color string (e.g., '#fff') or 0 (skip).
+Example:
+const COIN = [
+  ['#fff', '#fff'],
+  ['#fff', '#ff0']
+];
+tick() {
+  Utils.drawColorPixels(ctx, 10, 10, 4, COIN);
+}
+
+Utils.rectIntersect(x1, y1, w1, h1, x2, y2, w2, h2)
+What it is: Standard Axis-Aligned Bounding Box (AABB) collision detection.
+Where it must be used: Inside your tick() function, during the physics/update phase (before drawing).
+How to use it: Check if two rectangles overlap (e.g., player hitting an obstacle, bullet hitting an enemy).
+Parameters: x, y (top-left), w, h (width/height) for both Box 1 and Box 2.
+Returns: true if they overlap, false otherwise.
+Example:
+tick() {
+  let hit = Utils.rectIntersect(
+    player.x, player.y, 20, 20, // Player box
+    enemy.x, enemy.y, 40, 40    // Enemy box
+  );
+  if (hit) player.dead = true;
+}
+
+Utils.prettyKey(code)
+What it is: Converts raw browser codes into readable text.
+Where it must be used: Inside your tick() function, usually when drawing "Game Over" text on the screen.
+How to use it: If you want to draw "Press KeyR to Restart" on the screen, raw KeyR looks bad. This converts it to R.
+Parameters: code (String) - Usually KEYS.actionName.
+Returns: Formatted string.
+Example:
+tick() {
+  if (isGameOver) {
+    const text = 'Press ' + Utils.prettyKey(KEYS.restart) + ' to Restart';
+    // Returns "Press R to Restart"
+    ctx.fillText(text, 100, 150);
+  }
+}`;
+
+  navigator.clipboard.writeText(guideText).then(() => {
+    showToast("Manual copied to clipboard!");
+  }).catch(() => {
+    showToast("Failed to copy manual.", "error");
+  });
+}
+
+// --- ENGINE CONFIG ---
+let hubBindings = JSON.parse(localStorage.getItem('hub_bindings_v2') || '{"hide": "KeyH", "show": "KeyJ", "debug": "F3"}');
+
+let comboRecorder = { active: false, keys: new Set(), action: null, btn: null };
+
+function showEngineSettingsModal() {
+  document.getElementById('engineSettingsModal').style.display = 'flex';
+  document.getElementById('hubRebind-hide').innerText = hubBindings.hide || 'Unbound';
+  document.getElementById('hubRebind-show').innerText = hubBindings.show || 'Unbound';
+  document.getElementById('hubRebind-debug').innerText = hubBindings.debug || 'Unbound';
+}
+function hideEngineSettingsModal() {
+  document.getElementById('engineSettingsModal').style.display = 'none';
+}
+function startHubRebinding(action) {
+  if (comboRecorder.active) return;
+  const btn = document.getElementById('hubRebind-' + action);
+  if (!btn) return;
+  
+  btn.classList.add('listening');
+  btn.innerText = 'Hold keys...';
+  
+  comboRecorder.active = true;
+  comboRecorder.action = action;
+  comboRecorder.btn = btn;
+  comboRecorder.keys = new Set();
+}
+
+// --- EXTRACTOR ---
+function showExtractModal() {
+  document.getElementById('extractModal').style.display = 'flex';
+  document.getElementById('extractInput').value = '';
+  setTimeout(() => document.getElementById('extractInput').focus(), 100);
+}
+function hideExtractModal() {
+  document.getElementById('extractModal').style.display = 'none';
+}
+
+function extractFunctionBody(code, startIndex) {
+  let braceIndex = code.indexOf('{', startIndex);
+  if (braceIndex === -1) return '';
+  let depth = 1;
+  let endIndex = braceIndex + 1;
+  let inString = false;
+  let stringChar = '';
+  let inComment = false;
+  let commentChar = '';
+
+  while (depth > 0 && endIndex < code.length) {
+    let char = code[endIndex];
+    let prevChar = endIndex > 0 ? code[endIndex - 1] : '';
+
+    if (inString) {
+      if (char === stringChar && prevChar !== '\\') {
+        inString = false;
+      }
+    } else if (inComment) {
+      if (commentChar === '//' && char === '\n') inComment = false;
+      if (commentChar === '/*' && char === '*' && code[endIndex+1] === '/') {
+        inComment = false;
+        endIndex++;
+      }
+    } else {
+      if (char === '"' || char === "'" || char === '`') {
+        inString = true;
+        stringChar = char;
+      } else if (char === '/' && code[endIndex+1] === '/') {
+        inComment = true;
+        commentChar = '//';
+        endIndex++;
+      } else if (char === '/' && code[endIndex+1] === '*') {
+        inComment = true;
+        commentChar = '/*';
+        endIndex++;
+      } else if (char === '{') {
+        depth++;
+      } else if (char === '}') {
+        depth--;
+      }
+    }
+    endIndex++;
+  }
+  return code.substring(startIndex, endIndex);
+}
+
+function extractGames() {
+  const scriptText = document.getElementById('extractInput').value.trim();
+  if (!scriptText) {
+    showToast("Paste a script first.", "error");
+    return;
+  }
+
+  try {
+    let cleanScript = scriptText.replace(/^javascript:/, '').trim();
+    
+    // 1. Find the Games array
+    const match = cleanScript.match(/const Games = (\[[\s\S]*?\]);\s*\n\s*Games\.forEach/);
+    if (!match) {
+      throw new Error("Could not find 'const Games = [...]' in the script. Make sure it's un-minified.");
+    }
+    const arrayStr = match[1];
+    
+    // 2. Extract all factory functions to resolve references (e.g., `factory: createDino`)
+    const funcRegex = /function\s+(create\w+)\s*\(\)\s*\{/g;
+    let funcMatch;
+    let funcsCode = '';
+    while ((funcMatch = funcRegex.exec(cleanScript)) !== null) {
+      let startIndex = funcMatch.index;
+      let funcBody = extractFunctionBody(cleanScript, startIndex);
+      funcsCode += funcBody + '\n';
+    }
+    
+    // 3. Evaluate the array with the extracted functions in scope
+    const fullEvalCode = funcsCode + '\nreturn ' + arrayStr + ';';
+    const parsedGames = new Function(fullEvalCode)();
+    
+    if (!Array.isArray(parsedGames)) throw new Error("Extracted data is not an array.");
+
+    let importedCount = 0;
+    parsedGames.forEach(g => {
+      if (!g || !g.name || !g.factory) return;
+      
+      // Convert factory function back to string
+      const factoryStr = g.factory.toString();
+      
+      modules.push({
+        name: g.name,
+        icon: g.icon || '',
+        bindings: g.controls || {},
+        code: factoryStr
+      });
+      importedCount++;
+    });
+
+    if (importedCount === 0) throw new Error("No valid games found in the array.");
+
+    saveModules();
+    renderFileTree();
+    selectModule(modules.length - importedCount);
+    hideExtractModal();
+    showToast(`Successfully extracted ${importedCount} games!`);
+  } catch (e) {
+    showToast("Extraction failed: " + e.message, "error");
+  }
+}
+
+// --- SYNTAX HIGHLIGHTING ---
+function escapeHtml(text) {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function highlightTokens(text) {
+  let escaped = escapeHtml(text);
+  escaped = escaped.replace(/\b(function|return|const|let|var|if|else|for|while|do|switch|case|break|continue|new|this|true|false|null|undefined|typeof|instanceof|in|of|class|extends|super|import|from|export|default|try|catch|finally|throw)\b/g, '<span class="c-keyword">$1</span>');
+  escaped = escaped.replace(/\b(\d+\.?\d*)\b/g, '<span class="c-number">$1</span>');
+  escaped = escaped.replace(/\b([A-Za-z_]\w*)(?=\s*\()/g, '<span class="c-function">$1</span>');
+  escaped = escaped.replace(/([{}()\[\];,])/g, '<span class="c-punct">$1</span>');
+  return escaped;
+}
+
+function highlightCode(code) {
+  const regex = /(\/\/[^\n]*|\/\*[\s\S]*?\*\/|`(?:[^`\\]|\\.)*`|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g;
+  let result = '';
+  let lastIndex = 0;
+  let match;
+  
+  while ((match = regex.exec(code)) !== null) {
+    result += highlightTokens(code.substring(lastIndex, match.index));
+    let token = match[0];
+    let cls = 'c-string';
+    if (token.startsWith('//') || token.startsWith('/*')) {
+      cls = 'c-comment';
+    }
+    result += `<span class="${cls}">${escapeHtml(token)}</span>`;
+    lastIndex = regex.lastIndex;
+  }
+  result += highlightTokens(code.substring(lastIndex));
+  return result;
+}
+
+function updateCodeHighlight() {
+  const editor = document.getElementById('codeEditor');
+  const highlight = document.getElementById('codeHighlight');
+  highlight.innerHTML = highlightCode(editor.value + '\n');
+}
+
+// --- UI RENDERING ---
+function renderFileTree() {
+  const list = document.getElementById('gamesList');
+  list.innerHTML = '';
+  modules.forEach((mod, index) => {
+    const div = document.createElement('div');
+    div.className = 'file-tree-item' + (activeModuleIndex === index ? ' active' : '');
+    div.innerHTML = `
+      <span class="name">${mod.dirty ? '<span class="dirty"></span>' : ''}${mod.name || 'Unnamed'}</span>
+      <button class="del-btn" title="Delete Module">✕</button>
+    `;
+    div.onclick = () => selectModule(index);
+    div.querySelector('.del-btn').onclick = (e) => {
+      e.stopPropagation();
+      deleteModule(index);
+    };
+    list.appendChild(div);
+  });
+  updateQuickLaunch();
+}
+
+function deleteModule(index) {
+  const modName = modules[index].name || 'Unnamed';
+  if (!confirm(`Are you sure you want to delete '${modName}'?`)) return;
+  
+  modules.splice(index, 1);
+  saveModules();
+  
+  if (activeModuleIndex === index) {
+    activeModuleIndex = -1;
+    selectModule(modules.length > 0 ? 0 : -1);
+  } else if (activeModuleIndex > index) {
+    activeModuleIndex--;
+  }
+  
+  renderFileTree();
+  showToast(`Module '${modName}' deleted`);
+}
+
+function updateQuickLaunch() {
+  const select = document.getElementById('quickLaunch');
+  const currentVal = select.value;
+  select.innerHTML = '<option value="">Run Hub Menu</option>';
+  modules.forEach((mod, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = mod.name || 'Unnamed';
+    select.appendChild(opt);
+  });
+  select.value = currentVal;
+}
+
+function selectModule(index) {
+  if (activeModuleIndex !== -1 && modules[activeModuleIndex]) {
+    modules[activeModuleIndex].dirty = false;
+  }
+  activeModuleIndex = index;
+  renderFileTree();
+  
+  const editor = document.getElementById('codeEditor');
+  const empty = document.getElementById('emptyState');
+  const title = document.getElementById('editorTitle');
+  const tabsContainer = document.getElementById('tabsContainer');
+  
+  if (index === -1) {
+    editor.style.display = 'none';
+    document.getElementById('codeHighlight').style.display = 'none';
+    document.getElementById('codeView').style.display = 'none';
+    document.getElementById('configView').style.display = 'none';
+    empty.style.display = 'flex';
+    title.innerText = 'Select a Module';
+    tabsContainer.style.display = 'none';
+    return;
+  }
+  
+  empty.style.display = 'none';
+  tabsContainer.style.display = 'flex';
+  
+  const mod = modules[index];
+  title.innerText = `${mod.name}.js`;
+  editor.value = mod.code;
+  editor.style.display = 'block';
+  document.getElementById('codeHighlight').style.display = 'block';
+  
+  document.getElementById('iconInput').value = mod.icon || '';
+  handleIconChange();
+  renderControlsConfig(index);
+  updateLineNumbers();
+  updateCodeHighlight();
+  switchTab(currentView);
+}
+
+function switchTab(view) {
+  currentView = view;
+  const codeView = document.getElementById('codeView');
+  const configView = document.getElementById('configView');
+  const tabCode = document.getElementById('tabCode');
+  const tabConfig = document.getElementById('tabConfig');
+  
+  if (view === 'code') {
+    codeView.style.display = 'flex';
+    configView.style.display = 'none';
+    tabCode.classList.add('active');
+    tabConfig.classList.remove('active');
+  } else {
+    codeView.style.display = 'none';
+    configView.style.display = 'flex';
+    tabCode.classList.remove('active');
+    tabConfig.classList.add('active');
+  }
+}
+
+function handleFileUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  
+  if (file.type === 'image/svg+xml') {
+    reader.onload = (e) => {
+      document.getElementById('iconInput').value = e.target.result;
+      handleIconChange();
+    };
+    reader.readAsText(file);
+  } else {
+    reader.onload = (e) => {
+      document.getElementById('iconInput').value = e.target.result;
+      handleIconChange();
+    };
+    reader.readAsDataURL(file);
+  }
+  event.target.value = '';
+}
+
+function clearIcon() {
+  document.getElementById('iconInput').value = '';
+  handleIconChange();
+}
+
+function handleIconChange() {
+  if (activeModuleIndex === -1) return;
+  const iconCode = document.getElementById('iconInput').value;
+  const preview = document.getElementById('iconPreview');
+  
+  // Convert raw SVG to a Data URI to perfectly escape all quotes and characters
+  // This prevents the SVG from breaking the JavaScript string when compiled.
+  let iconData = iconCode;
+  if (iconCode.trim().startsWith('<svg')) {
+    try {
+      iconData = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(iconCode);
+    } catch (e) {
+      console.error("Failed to encode SVG", e);
+    }
+  }
+  
+  modules[activeModuleIndex].icon = iconData;
+  modules[activeModuleIndex].dirty = true;
+  
+  preview.innerHTML = '';
+  if (iconData.trim()) {
+    if (iconData.startsWith('data:image')) {
+      const img = document.createElement('img');
+      img.src = iconData;
+      preview.appendChild(img);
+    } else {
+      preview.innerText = 'Invalid SVG';
+    }
+  } else {
+    preview.innerText = 'No Icon';
+  }
+  saveModules();
+  renderFileTree();
+}
+
+function renderControlsConfig(index) {
+  const container = document.getElementById('controlsConfigList');
+  if (!container) return;
+  const mod = modules[index];
+  const actions = Object.keys(mod.bindings || {});
+  
+  if (actions.length === 0) {
+    container.innerHTML = '<div style="color:#666;font-size:12px;font-style:italic;grid-column: 1 / -1; text-align:center;">No bindings found. Use KEYS.action in your code.</div>';
+    return;
+  }
+
+  let html = '';
+  for (let i = 0; i < actions.length; i += 2) {
+    html += '<div style="display:flex; gap:16px; margin-bottom:16px; grid-column: 1 / -1;">';
+    for (let j = 0; j < 2; j++) {
+      if (i + j < actions.length) {
+        const action = actions[i + j];
+        const data = mod.bindings[action];
+        html += `
+          <div class="control-box" style="flex:1;">
+            <div class="control-box-header">
+              <span>Action</span>
+              <input type="text" value="${action}" readonly style="width: auto; background: transparent; border: none; color: #888; text-transform: uppercase; font-family: monospace;">
+            </div>
+            <div class="control-row">
+              <label>Label</label>
+              <input type="text" value="${data.label}" oninput="updateControlLabel(${index}, '${action}', this.value)">
+            </div>
+            <div class="control-row">
+              <label>Default Key</label>
+              <button class="rebind-btn" id="rebind-${index}-${action}" onclick="startRebinding(${index}, '${action}')">${data.default}</button>
+            </div>
+          </div>
+        `;
+      }
+    }
+    html += '</div>';
+  }
+  container.innerHTML = html;
+}
+
+function updateControlLabel(index, action, value) {
+  modules[index].bindings[action].label = value;
+  modules[index].dirty = true;
+  saveModules();
+  renderFileTree();
+}
+
+function startRebinding(index, action) {
+  if (compilerRebinding) return;
+  const btn = document.getElementById(`rebind-${index}-${action}`);
+  if (!btn) return;
+  
+  btn.classList.add('listening');
+  btn.innerText = '...';
+  
+  compilerRebinding = (code) => {
+    modules[index].bindings[action].default = code;
+    modules[index].dirty = true;
+    saveModules();
+    renderControlsConfig(index);
+    renderFileTree();
+    compilerRebinding = null;
+  };
+}
+
+document.addEventListener('keydown', (e) => {
+  if (comboRecorder.active) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.code === 'Escape') {
+      comboRecorder.btn.innerText = hubBindings[comboRecorder.action] || 'Unbound';
+      comboRecorder.btn.classList.remove('listening');
+      comboRecorder.active = false;
+      return;
+    }
+    if (e.code === 'Backspace') {
+      hubBindings[comboRecorder.action] = '';
+      localStorage.setItem('hub_bindings_v2', JSON.stringify(hubBindings));
+      comboRecorder.btn.innerText = 'Unbound';
+      comboRecorder.btn.classList.remove('listening');
+      comboRecorder.active = false;
+      return;
+    }
+    if (!e.repeat) {
+      comboRecorder.keys.add(e.code);
+      comboRecorder.btn.innerText = Array.from(comboRecorder.keys).join(' + ');
+    }
+    return;
+  }
+  
+  if (compilerRebinding) {
+    e.preventDefault();
+    e.stopPropagation();
+    compilerRebinding(e.code);
+  }
+});
+
+document.addEventListener('keyup', (e) => {
+  if (comboRecorder.active && comboRecorder.keys.size > 0) {
+    const comboStr = Array.from(comboRecorder.keys).join('+');
+    hubBindings[comboRecorder.action] = comboStr;
+    localStorage.setItem('hub_bindings_v2', JSON.stringify(hubBindings));
+    comboRecorder.btn.innerText = comboStr;
+    comboRecorder.btn.classList.remove('listening');
+    comboRecorder.active = false;
+    comboRecorder.keys.clear();
+  }
+});
+
+function handleCodeChange() {
+  if (activeModuleIndex === -1) return;
+  const editor = document.getElementById('codeEditor');
+  modules[activeModuleIndex].code = editor.value;
+  modules[activeModuleIndex].dirty = true;
+  saveModules();
+  scanForBindings(activeModuleIndex);
+  updateLineNumbers();
+  updateCodeHighlight();
+  renderFileTree();
+}
+
+function syncScroll() {
+  const editor = document.getElementById('codeEditor');
+  const highlight = document.getElementById('codeHighlight');
+  const lineNumbers = document.getElementById('lineNumbers');
+  highlight.scrollTop = editor.scrollTop;
+  highlight.scrollLeft = editor.scrollLeft;
+  lineNumbers.scrollTop = editor.scrollTop;
+}
+
+function updateLineNumbers() {
+  const editor = document.getElementById('codeEditor');
+  const lines = editor.value.split('\n').length;
+  let nums = '';
+  for(let i=1; i<=lines; i++) nums += i + '\n';
+  document.getElementById('lineNumbers').innerText = nums;
+}
+
+function scanForBindings(index) {
+  const code = modules[index].code;
+  const regex = /KEYS\.([a-zA-Z_]\w*)/g;
+  const matches = new Set();
+  let match;
+  while ((match = regex.exec(code)) !== null) matches.add(match[1]);
+
+  const oldBindings = modules[index].bindings || {};
+  const newBindings = {};
+  matches.forEach(action => {
+    newBindings[action] = oldBindings[action] ? { 
+      label: oldBindings[action].label || action, 
+      default: oldBindings[action].default || 'Space' 
+    } : { 
+      label: action, 
+      default: 'Space' 
+    };
+  });
+
+  modules[index].bindings = newBindings;
+  saveModules();
+  renderControlsConfig(index);
+}
+
+function saveModules() {
+  localStorage.setItem('hub_modules_v2', JSON.stringify(modules));
+}
+
+function logOutput(msg) {
+  const consoleDiv = document.getElementById('outputConsole');
+  consoleDiv.innerHTML += msg + '\n';
+  consoleDiv.scrollTop = consoleDiv.scrollHeight;
+}
+
+// --- PLAYTEST MEDDLER ---
+const MEDDLER_CODE = `
+window.Meddler = {
+  init() {
+    const checkHub = () => {
+      if (window.GameHub) this.patchHub(window.GameHub);
+      else setTimeout(checkHub, 10);
+    };
+    checkHub();
+  },
+  patchHub(Hub) {
+    const originalLaunch = Hub.launch.bind(Hub);
+    Hub.launch = (game) => {
+      originalLaunch(game);
+      window.parent.postMessage({ type: 'game_launched' }, '*');
+    };
+  }
+};
+window.Meddler.init();
+`;
+
+// --- COMPILER LOGIC ---
+function getRawScript() {
+  const engineCode = document.getElementById('engineCode').textContent;
+  
+  let gamesArrayString = 'const Games = [';
+  modules.forEach(mod => {
+    let controlsStr = '{';
+    if (mod.bindings) {
+      Object.entries(mod.bindings).forEach(([action, data]) => {
+        controlsStr += `${action}: { label: "${data.label || action}", default: "${data.default}" },`;
+      });
+    }
+    controlsStr += '}';
+    
+    // Use JSON.stringify to perfectly encode ANY valid SVG (or Data URL) without breaking the script
+    let safeName = JSON.stringify(mod.name || 'Unnamed');
+    let safeIcon = JSON.stringify(mod.icon || '');
+    gamesArrayString += `{ name: ${safeName}, icon: ${safeIcon}, controls: ${controlsStr}, factory: ${mod.code} },`;
+  });
+  gamesArrayString += '];';
+
+  const launchIdx = document.getElementById('quickLaunch').value;
+  const hubKeysStr = `const HUB_KEYS = ${JSON.stringify(hubBindings)};`;
+  const bootstrap = `
+    ${hubKeysStr}
+    Games.forEach(g => Store.bindings.register(g.name, g.controls));
+    ['game-selector-menu','hub-settings-panel','hub-game-window','dino-game-canvas','gd-game-canvas','rcr-canvas','g','flp','blockblast-canvas', 'game-hub-panel'].forEach(id => { const el = document.getElementById(id); if (el) el.remove(); });
+    if (window.GameHub) { window.GameHub.stop(); }
+    Hub.init();
+    ${launchIdx !== '' ? `Hub.launch(Games[${launchIdx}].factory());` : `UI.showMenu();`}
+  `;
+
+  return `(function(){'use strict';${engineCode}${gamesArrayString}${bootstrap}})();`;
+}
+
+function compileScript() {
+  return 'javascript:' + getRawScript();
+}
+
+function compileAndRun() {
+  let rawCode = getRawScript();
+  rawCode = rawCode.replace(/<\/script>/g, '<\\/script>');
+  
+  document.getElementById('errorBanner').style.display = 'none';
+  logOutput("[COMPILER]: Script compiled. Launching fullscreen sandbox...");
+  
+  modules.forEach(m => m.dirty = false);
+  renderFileTree();
+  
+  document.getElementById('sandboxOverlay').style.display = 'flex';
+  document.getElementById('btnPlayPause').innerText = '⏸';
+  
+  const oldIframe = document.getElementById('sandboxFrame');
+  const newIframe = document.createElement('iframe');
+  newIframe.id = 'sandboxFrame';
+  newIframe.sandbox = 'allow-scripts allow-same-origin';
+  newIframe.style.cssText = 'flex: 1; border: none; background: #fff; width: 100%;';
+  oldIframe.parentNode.replaceChild(newIframe, oldIframe);
+  
+  const doc = newIframe.contentDocument || newIframe.contentWindow.document;
+  
+  doc.open();
+  doc.write(`
+    ${MOCK_WEBSITE}
+    <script>
+      ${MEDDLER_CODE}
+      window.console.log = (msg) => parent.logOutput('[SANDBOX]: ' + msg);
+      window.console.error = (msg) => { parent.logOutput('[ERROR]: ' + msg); parent.document.getElementById('errorBanner').innerText = msg; parent.document.getElementById('errorBanner').style.display = 'block'; };
+      try { ${rawCode} } catch(e) { window.console.error(e.message); }
+    <\/script>
+  `);
+  doc.close();
+}
+
+function closeSandbox() {
+  document.getElementById('sandboxOverlay').style.display = 'none';
+  const iframe = document.getElementById('sandboxFrame');
+  iframe.src = 'about:blank';
+}
+
+window.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'game_launched') {
+    document.getElementById('btnPlayPause').innerText = '⏸';
+  }
+});
+
+function togglePlayPause() {
+  const iframe = document.getElementById('sandboxFrame');
+  const Hub = iframe.contentWindow.GameHub;
+  if (!Hub || !Hub._game) return;
+  
+  if (Hub._raf) {
+    Hub.pause();
+    document.getElementById('btnPlayPause').innerText = '▶';
+  } else {
+    Hub.resume();
+    document.getElementById('btnPlayPause').innerText = '⏸';
+  }
+}
+
+function stopGame() {
+  const iframe = document.getElementById('sandboxFrame');
+  const Hub = iframe.contentWindow.GameHub;
+  if (!Hub) return;
+  
+  Hub.stop();
+  if (iframe.contentWindow.UI) {
+    iframe.contentWindow.UI.showMenu();
+  }
+  document.getElementById('btnPlayPause').innerText = '▶';
+}
+
+function copyOutput() {
+  const code = compileScript();
+  navigator.clipboard.writeText(code).then(() => {
+    showToast("Bookmarklet copied to clipboard!");
+  }).catch(() => {
+    showToast("Failed to copy. Check permissions.", "error");
+  });
+}
+
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    compileAndRun();
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    copyOutput();
+  }
+  if (e.key === 'Escape' && document.getElementById('sandboxOverlay').style.display === 'flex') {
+    closeSandbox();
+  }
+});
+
+// INIT
+renderFileTree();
+if (modules.length > 0) selectModule(0);
+logOutput("Compiler Engine Ready. Select a game to edit or click Compile & Run.");
+</script>
+</body>
+</html>
